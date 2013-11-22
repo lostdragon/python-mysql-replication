@@ -479,17 +479,18 @@ class TableMapEvent(BinLogEvent):
         else:
             self.column_schemas = self._ctl_connection._get_table_information(self.schema, self.table)
 
-        # Read columns meta data
-        column_types = list(self.packet.read(self.column_count))
-        self.packet.read_length_coded_binary()
-        for i in range(0, len(column_types)):
-            column_type = column_types[i]
-            column_schema = self.column_schemas[i]
-            col = Column(byte2int(column_type), column_schema, from_packet)
-            self.columns.append(col)
-
+        if self.column_schemas is not None:
+            # Read columns meta data
+            column_types = list(self.packet.read(self.column_count))
+            self.packet.read_length_coded_binary()
+            for i in range(0, len(column_types)):
+                column_type = column_types[i]
+                column_schema = self.column_schemas[i]
+                col = Column(byte2int(column_type), column_schema, from_packet)
+                self.columns.append(col)
+            
         self.table_obj = Table(self.column_schemas, self.table_id, self.schema,
-                               self.table, self.columns)
+                                   self.table, self.columns)
 
         # TODO: get this informations instead of trashing data
         # n              NULL-bitmask, length: (column-length * 8) / 7

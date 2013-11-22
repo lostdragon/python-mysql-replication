@@ -17,7 +17,7 @@ class BinLogStreamReader(object):
 
     def __init__(self, connection_settings={}, resume_stream=False,
                  blocking=False, only_events=None, server_id=255,
-                 log_file=None, log_pos=None, filter_non_implemented_events=True):
+                 log_file=None, log_pos=None, filter_non_implemented_events=True, replicate_do_dbs=None):
         """
         Attributes:
             resume_stream: Start for event from position or the latest event of
@@ -38,6 +38,7 @@ class BinLogStreamReader(object):
         self.__filter_non_implemented_events = filter_non_implemented_events
         self.__server_id = server_id
         self.__use_checksum = False
+        self.__replicate_do_dbs = replicate_do_dbs
 
         #Store table meta information
         self.table_map = {}
@@ -177,6 +178,10 @@ class BinLogStreamReader(object):
         return False
 
     def __get_table_information(self, schema, table):
+
+        if (self.__replicate_do_dbs is not None) and (schema not in self.__replicate_do_dbs):
+            return None
+
         for i in range(1, 3):
             try:
                 if not self.__connected_ctl:
@@ -198,6 +203,14 @@ class BinLogStreamReader(object):
                 code, message = error.args
                 # 2013: Connection Lost
                 if code == 2013:
+                    self.__connected_ctl = False
+                    continue
+                else:
+                    raise error
+            except IOError as error:
+                code, message = error.args
+                # 32: Broken pipe
+                if code == 32:
                     self.__connected_ctl = False
                     continue
                 else:
