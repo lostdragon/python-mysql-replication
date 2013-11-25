@@ -12,6 +12,12 @@ Use cases
 * Audit
 * Real time analytics
 
+Changes
+=========
+Add replicate_do_dbs params support
+Catch socket broken pipe Exception
+Add replication example
+
 Documentation
 ==============
 
@@ -69,6 +75,9 @@ In your MySQL server configuration file you need to enable replication:
     expire_logs_days = 10
     max_binlog_size  = 100M
     binlog-format    = row #Very important if you want to receive write, update and delete row events
+
+For no super user, should grant user REPLICATION CLIENT and REPLICATION SLAVE Permission
+    GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'test'@'%';
 
 Examples
 =========

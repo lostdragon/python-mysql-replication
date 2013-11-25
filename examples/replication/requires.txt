@@ -1,0 +1,5 @@
+python >= 2.7.0
+logging
+ConfigParser
+mysql-replication
+pymysql

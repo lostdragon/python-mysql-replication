@@ -141,6 +141,12 @@ class BinLogStreamReader(object):
                 if code == 2013:
                     self.__connected_stream = False
                     continue
+            except IOError as error:
+                code, message = error.args
+                # 32: Broken pipe
+                if code == 32:
+                    self.__connected_stream = False
+                    continue
 
             if pkt.is_eof_packet():
                 return None
