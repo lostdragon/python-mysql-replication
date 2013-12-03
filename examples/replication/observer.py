@@ -73,13 +73,15 @@ class Observer(object):
                 # Process Feed
                 for binlogevent in stream:
                     self.feed(binlogevent)
-                    # Write log_file and log_pos
-                    config = ConfigParser.RawConfigParser()
-                    config.add_section('log-bin')
-                    config.set('log-bin', 'log_file', stream.log_file)
-                    config.set('log-bin', 'log_pos', stream.log_pos)
-                    with open(self.log_bin_file, 'wb') as configfile:
-                        config.write(configfile)
+                    # not complete Event
+                    if not isinstance(binlogevent, TableMapEvent):
+                        # Write log_file and log_pos
+                        config = ConfigParser.RawConfigParser()
+                        config.add_section('log-bin')
+                        config.set('log-bin', 'log_file', stream.log_file)
+                        config.set('log-bin', 'log_pos', stream.log_pos)
+                        with open(self.log_bin_file, 'wb') as configfile:
+                            config.write(configfile)
 
                 stream.close()
             except Exception as e:
@@ -120,11 +122,11 @@ class Observer(object):
                 # check rows event
                 elif isinstance(binlogevent, RowsEvent):
                     if isinstance(binlogevent, WriteRowsEvent):
-                        data = ['insert', binlogevent.table, binlogevent.rows[0]['values']]
+                        data = ['insert', binlogevent.table, binlogevent.rows[0]]
                     elif isinstance(binlogevent, UpdateRowsEvent):
-                        data = ['update', binlogevent.table, binlogevent.rows[0]['after_values']]
+                        data = ['update', binlogevent.table, binlogevent.rows[0]]
                     elif isinstance(binlogevent, DeleteRowsEvent):
-                        data = ['delete', binlogevent.table, binlogevent.rows[0]['values']]
+                        data = ['delete', binlogevent.table, binlogevent.rows[0]]
 
                 if data:
                     rowcount = self.process(data)
@@ -185,39 +187,45 @@ class Observer(object):
     def default_process(self, query_type, table, params):
         sql = ''
         args = None
+
         for case in helper.Switch(query_type):
             if case('query'):
                 sql = params.replace(self.source_db, self.to_db)
                 args = None
                 break
             if case('insert'):
+                after_values = params['values']
                 keys = list()
                 values = list()
-                for k, v in params.items():
+                for k, v in after_values.items():
                     keys.append('`' + str(k) + '`')
                     values.append('%(' + str(k) + ')s')
                 sql = """INSERT INTO `%s` (%s) VALUES (%s);""" % (table, ', '.join(keys), ', '.join(values))
-                args = params
+                args = after_values
                 break
             if case('update'):
+                before_values = params['before_values']
+                after_values = params['after_values']
                 sets = list()
                 wheres = list()
-                for k, v in params.items():
-                    if k not in self.primary_keys[table]:
-                        sets.append('`' + str(k) + '`' + '= %(' + str(k) + ')s')
-                    else:
-                        wheres.append('`' + str(k) + '`' + '= %(' + str(k) + ')s')
-                sql = """UPDATE `%s` set %s WHERE %s;""" % (table, ', '.join(sets), 'AND '.join(wheres))
-                args = params
+                for k, v in after_values.items():
+                    sets.append('`' + str(k) + '`' + '= %(' + str(k) + ')s')
+                    if k in self.primary_keys[table]:
+                        wheres.append('`' + str(k) + '`' + '= %(before_' + str(k) + ')s')
+                        # using before primary keys
+                        after_values['before_' + str(k)] = before_values[k]
+                sql = """UPDATE `%s` set %s WHERE %s;""" % (table, ', '.join(sets), ' AND '.join(wheres))
+                args = after_values
                 break
             if case('delete'):
+                after_values = params['values']
                 wheres = list()
-                for k, v in params.items():
+                for k, v in after_values.items():
                     if k in self.primary_keys[table]:
                         wheres.append('`' + str(k) + '`' + '= %(' + str(k) + ')s')
 
-                sql = """DELETE FROM `%s` WHERE %s;""" % (table, 'AND '.join(wheres))
-                args = params
+                sql = """DELETE FROM `%s` WHERE %s;""" % (table, ' AND '.join(wheres))
+                args = after_values
                 break
         return [sql, args]
 
