@@ -14,9 +14,9 @@ Use cases
 
 Changes
 =========
-Add replicate_do_dbs params support
-Catch socket broken pipe Exception
-Add replication example
+* Add replicate_do_dbs params support
+* Catch socket broken pipe Exception
+* Add replication example
 
 Documentation
 ==============
